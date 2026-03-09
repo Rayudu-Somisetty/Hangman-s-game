@@ -34,16 +34,12 @@ const mediumWords = [
 ];
 
 // Game state
-let currentWord = '';
-let guessedLetters = [];
-let wrongAttempts = 0;
 let maxAttempts = 6;
 let difficulty = '';
-let hintsUsed = 0;
 
 // Multi-word game state
 let selectedWordCount = 1;
-let wordsList = [];
+let wordsData = []; // Array of {word, guessedLetters, wrongAttempts, hintsUsed, status}
 let currentWordIndex = 0;
 let score = 0;
 
@@ -128,60 +124,89 @@ function startGame(level) {
     difficulty = level;
     
     // Generate list of words based on selected count
-    wordsList = [];
     const sourceWords = level === 'easy' ? easyWords : mediumWords;
     const shuffled = [...sourceWords].sort(() => Math.random() - 0.5);
     
+    // Initialize all words data
+    wordsData = [];
     for (let i = 0; i < selectedWordCount; i++) {
-        wordsList.push(shuffled[i]);
+        wordsData.push({
+            word: shuffled[i],
+            guessedLetters: [],
+            wrongAttempts: 0,
+            hintsUsed: 0,
+            status: 'pending' // pending, active, won, lost
+        });
     }
     
-    // Reset game state for multi-word session
+    // Set first word as active
+    wordsData[0].status = 'active';
     currentWordIndex = 0;
     score = 0;
     
     // Update progress display
     document.getElementById('totalWords').textContent = selectedWordCount;
     document.getElementById('totalWordsScore').textContent = selectedWordCount;
-    
-    // Start first word
-    loadNextWord();
-    
-    showScreen('gameScreen');
-}
-
-// Load next word in the list
-function loadNextWord() {
-    if (currentWordIndex >= wordsList.length) {
-        // All words completed - show final results
-        showFinalResults();
-        return;
-    }
-    
-    currentWord = wordsList[currentWordIndex];
-    
-    // Reset word-specific state
-    guessedLetters = [];
-    wrongAttempts = 0;
-    hintsUsed = 0;
-    
-    // Update UI
     document.getElementById('currentDifficulty').textContent = difficulty.toUpperCase();
-    document.getElementById('attemptsLeft').textContent = maxAttempts;
-    document.getElementById('currentWordNum').textContent = currentWordIndex + 1;
-    document.getElementById('currentScore').textContent = score;
+    document.getElementById('currentWordNum').textContent = 1;
+    document.getElementById('currentScore').textContent = 0;
     
-    // Initialize hints
-    updateHintDisplay();
+    // Create all word blocks
+    createAllWordBlocks();
     
     // Create letter buttons
     createLetterButtons();
     
-    // Display word
-    updateWordDisplay();
-    
-    // Draw initial hangman canvas
+    // Update displays
+    updateHintDisplay();
+    updateAttemptsDisplay();
     drawHangman();
+    
+    showScreen('gameScreen');
+}
+
+// Create all word blocks at once
+function createAllWordBlocks() {
+    const wordsGrid = document.getElementById('wordsGrid');
+    wordsGrid.innerHTML = '';
+    
+    wordsData.forEach((wordData, index) => {
+        const wordBlock = document.createElement('div');
+        wordBlock.className = 'word-block';
+        wordBlock.id = `word-block-${index}`;
+        wordBlock.setAttribute('data-index', index);
+        
+        // Word number label
+        const wordLabel = document.createElement('div');
+        wordLabel.className = 'word-label';
+        wordLabel.textContent = `Word ${index + 1}`;
+        wordBlock.appendChild(wordLabel);
+        
+        // Word display area
+        const wordDisplay = document.createElement('div');
+        wordDisplay.className = 'word-display';
+        wordDisplay.id = `word-display-${index}`;
+        
+        // Create letter boxes
+        for (let letter of wordData.word) {
+            const letterBox = document.createElement('div');
+            letterBox.className = 'letter-box empty';
+            wordDisplay.appendChild(letterBox);
+        }
+        
+        wordBlock.appendChild(wordDisplay);
+        
+        // Status indicator
+        const statusIndicator = document.createElement('div');
+        statusIndicator.className = 'status-indicator';
+        statusIndicator.id = `status-${index}`;
+        wordBlock.appendChild(statusIndicator);
+        
+        wordsGrid.appendChild(wordBlock);
+    });
+    
+    // Mark first word as active
+    updateWordBlocksDisplay();
 }
 
 // Create letter buttons
@@ -202,67 +227,153 @@ function createLetterButtons() {
 
 // Guess letter
 function guessLetter(letter, btn) {
-    if (guessedLetters.includes(letter)) return;
+    const activeWord = wordsData[currentWordIndex];
     
-    guessedLetters.push(letter);
+    if (activeWord.guessedLetters.includes(letter)) return;
+    if (activeWord.status !== 'active') return;
+    
+    activeWord.guessedLetters.push(letter);
     btn.classList.add('used');
     
-    if (currentWord.includes(letter)) {
+    if (activeWord.word.includes(letter)) {
         // Correct guess
-        updateWordDisplay();
+        updateWordBlocksDisplay();
         checkWin();
     } else {
         // Wrong guess
-        wrongAttempts++;
-        document.getElementById('attemptsLeft').textContent = maxAttempts - wrongAttempts;
+        activeWord.wrongAttempts++;
+        updateAttemptsDisplay();
         drawHangman();
         
-        if (wrongAttempts >= maxAttempts) {
+        if (activeWord.wrongAttempts >= maxAttempts) {
             // Add dramatic death animation
             animateHangmanDeath();
-            // Wait longer to show the dead hangman with X eyes before game over
-            setTimeout(() => endGame(false), 2000);
+            // Wait longer to show the dead hangman with X eyes before marking as lost
+            setTimeout(() => {
+                markWordAsCompleted(false);
+            }, 2000);
         }
     }
 }
 
-// Update word display
-function updateWordDisplay() {
-    const wordDisplay = document.getElementById('wordDisplay');
-    wordDisplay.innerHTML = '';
-    
-    for (let letter of currentWord) {
-        const letterBox = document.createElement('div');
-        letterBox.className = 'letter-box';
+// Update all word blocks display
+function updateWordBlocksDisplay() {
+    wordsData.forEach((wordData, index) => {
+        const wordDisplay = document.getElementById(`word-display-${index}`);
+        const wordBlock = document.getElementById(`word-block-${index}`);
+        const statusIndicator = document.getElementById(`status-${index}`);
         
-        if (guessedLetters.includes(letter)) {
-            letterBox.textContent = letter.toUpperCase();
-        } else {
-            letterBox.classList.add('empty');
+        // Clear and rebuild letter boxes
+        wordDisplay.innerHTML = '';
+        for (let letter of wordData.word) {
+            const letterBox = document.createElement('div');
+            letterBox.className = 'letter-box';
+            
+            if (wordData.guessedLetters.includes(letter)) {
+                letterBox.textContent = letter.toUpperCase();
+            } else {
+                letterBox.classList.add('empty');
+            }
+            
+            wordDisplay.appendChild(letterBox);
         }
         
-        wordDisplay.appendChild(letterBox);
-    }
+        // Update block styling based on status
+        wordBlock.className = 'word-block';
+        if (wordData.status === 'active') {
+            wordBlock.classList.add('active');
+            statusIndicator.textContent = '▶ Playing';
+            statusIndicator.className = 'status-indicator active';
+        } else if (wordData.status === 'won') {
+            wordBlock.classList.add('won');
+            statusIndicator.textContent = '✓ Completed';
+            statusIndicator.className = 'status-indicator won';
+        } else if (wordData.status === 'lost') {
+            wordBlock.classList.add('lost');
+            statusIndicator.textContent = '✗ Failed';
+            statusIndicator.className = 'status-indicator lost';
+        } else {
+            wordBlock.classList.add('pending');
+            statusIndicator.textContent = '⋯ Waiting';
+            statusIndicator.className = 'status-indicator pending';
+        }
+    });
+}
+
+// Update attempts display
+function updateAttemptsDisplay() {
+    const activeWord = wordsData[currentWordIndex];
+    document.getElementById('attemptsLeft').textContent = maxAttempts - activeWord.wrongAttempts;
 }
 
 // Check win condition
 function checkWin() {
-    const allGuessed = currentWord.split('').every(letter => guessedLetters.includes(letter));
+    const activeWord = wordsData[currentWordIndex];
+    const allGuessed = activeWord.word.split('').every(letter => 
+        activeWord.guessedLetters.includes(letter)
+    );
     
     if (allGuessed) {
-        setTimeout(() => endGame(true), 500);
+        setTimeout(() => {
+            markWordAsCompleted(true);
+        }, 500);
+    }
+}
+
+// Mark current word as completed and move to next
+function markWordAsCompleted(won) {
+    const activeWord = wordsData[currentWordIndex];
+    
+    if (won) {
+        activeWord.status = 'won';
+        score++;
+    } else {
+        activeWord.status = 'lost';
+    }
+    
+    // Update score display
+    document.getElementById('currentScore').textContent = score;
+    
+    // Update word blocks
+    updateWordBlocksDisplay();
+    
+    // Move to next word or end game
+    currentWordIndex++;
+    
+    if (currentWordIndex < wordsData.length) {
+        // Move to next word
+        wordsData[currentWordIndex].status = 'active';
+        document.getElementById('currentWordNum').textContent = currentWordIndex + 1;
+        
+        // Reset letter buttons for new word
+        const letterButtons = document.querySelectorAll('.letter-btn');
+        letterButtons.forEach(btn => btn.classList.remove('used'));
+        
+        // Update displays
+        updateWordBlocksDisplay();
+        updateAttemptsDisplay();
+        updateHintDisplay();
+        drawHangman();
+    } else {
+        // All words completed
+        setTimeout(() => {
+            showFinalResults();
+        }, 1500);
     }
 }
 
 // Hint system - Reveals one random unrevealed letter
 function useHint() {
-    if (hintsUsed >= 3) return; // All hints used
+    const activeWord = wordsData[currentWordIndex];
+    
+    if (activeWord.hintsUsed >= 3) return; // All hints used
+    if (activeWord.status !== 'active') return;
     
     // Get unrevealed letters
     const unrevealedLetters = [];
-    for (let i = 0; i < currentWord.length; i++) {
-        const letter = currentWord[i];
-        if (!guessedLetters.includes(letter)) {
+    for (let i = 0; i < activeWord.word.length; i++) {
+        const letter = activeWord.word[i];
+        if (!activeWord.guessedLetters.includes(letter)) {
             unrevealedLetters.push(letter);
         }
     }
@@ -274,7 +385,7 @@ function useHint() {
     const randomLetter = unrevealedLetters[Math.floor(Math.random() * unrevealedLetters.length)];
     
     // Add to guessed letters
-    guessedLetters.push(randomLetter);
+    activeWord.guessedLetters.push(randomLetter);
     
     // Find and disable the letter button
     const letterButtons = document.querySelectorAll('.letter-btn');
@@ -285,24 +396,25 @@ function useHint() {
     });
     
     // Update hint display
-    hintsUsed++;
+    activeWord.hintsUsed++;
     updateHintDisplay();
     
     // Update word display
-    updateWordDisplay();
+    updateWordBlocksDisplay();
     
     // Check if won
     checkWin();
 }
 
 function updateHintDisplay() {
+    const activeWord = wordsData[currentWordIndex];
     const hintsLeftElement = document.getElementById('hintsLeft');
     const hintButton = document.getElementById('hintButton');
-    const hintsRemaining = 3 - hintsUsed;
+    const hintsRemaining = 3 - activeWord.hintsUsed;
     
     hintsLeftElement.textContent = hintsRemaining;
     
-    if (hintsRemaining === 0) {
+    if (hintsRemaining === 0 || activeWord.status !== 'active') {
         hintButton.disabled = true;
         hintButton.classList.add('disabled');
     } else {
@@ -341,52 +453,13 @@ function animateHangmanDeath() {
     }, 100);
 }
 
-// End game
-function endGame(won) {
-    if (won) {
-        score++;
-        document.getElementById('currentScore').textContent = score;
-    }
-    
-    // Move to next word after a delay
-    currentWordIndex++;
-    
-    if (currentWordIndex < wordsList.length) {
-        // More words to go - show transition
-        setTimeout(() => {
-            showWordTransition(won);
-        }, 1000);
-    } else {
-        // All words completed - show final results
-        setTimeout(() => {
-            showFinalResults();
-        }, 1500);
-    }
-}
-
-// Show transition between words
-function showWordTransition(won) {
-    const message = won ? '✓ Correct! Next word...' : '✗ Failed! Next word...';
-    
-    // Create overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'word-transition-overlay';
-    overlay.innerHTML = `<div class="transition-message ${won ? 'success' : 'failure'}">${message}</div>`;
-    document.body.appendChild(overlay);
-    
-    setTimeout(() => {
-        overlay.remove();
-        loadNextWord();
-    }, 1500);
-}
-
 // Show final results
 function showFinalResults() {
     const resultTitle = document.getElementById('resultTitle');
     const revealWord = document.getElementById('revealWord');
     const resultWord = document.getElementById('resultWord');
     
-    const percentage = Math.round((score / wordsList.length) * 100);
+    const percentage = Math.round((score / wordsData.length) * 100);
     
     if (percentage === 100) {
         resultTitle.textContent = 'PERFECT SCORE!';
@@ -410,7 +483,7 @@ function showFinalResults() {
     // Show final score
     resultWord.innerHTML = `
         <div class="final-score-container">
-            <div class="final-score">Final Score: <span class="score-number">${score}/${wordsList.length}</span></div>
+            <div class="final-score">Final Score: <span class="score-number">${score}/${wordsData.length}</span></div>
             <div class="score-percentage">${percentage}%</div>
         </div>
     `;
@@ -426,6 +499,10 @@ function showFinalResults() {
 // Draw hangman with 3D effect
 function drawHangman() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Get active word's wrong attempts
+    const activeWord = wordsData[currentWordIndex];
+    const wrongAttempts = activeWord ? activeWord.wrongAttempts : 0;
     
     // Scale factor based on canvas size (450x500 is base)
     const scaleX = canvas.width / 450;
