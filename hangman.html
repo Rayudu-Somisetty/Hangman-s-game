@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Hangman Game</title>
+    <link rel="stylesheet" href="hangman.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Menu Screen -->
+        <div id="menuScreen" class="screen active">
+            <div class="title-container">
+                <h1 class="title">HANGMAN</h1>
+                <div class="title-shadow">HANGMAN</div>
+            </div>
+            <p class="subtitle">Choose Your Game Settings</p>
+            
+            <!-- Word Count Selection -->
+            <div class="settings-container">
+                <div class="setting-group">
+                    <label class="setting-label">Number of Words:</label>
+                    <div class="word-count-buttons">
+                        <button class="word-count-btn active" onclick="selectWordCount(1)" data-count="1">1</button>
+                        <button class="word-count-btn" onclick="selectWordCount(3)" data-count="3">3</button>
+                        <button class="word-count-btn" onclick="selectWordCount(5)" data-count="5">5</button>
+                        <button class="word-count-btn" onclick="selectWordCount(10)" data-count="10">10</button>
+                    </div>
+                </div>
+                
+                <div class="setting-group">
+                    <label class="setting-label">Difficulty:</label>
+                    <div class="menu-buttons">
+                        <button class="btn btn-easy" onclick="startGame('easy')">
+                            <span class="btn-text">EASY</span>
+                            <div class="btn-shine"></div>
+                        </button>
+                        <button class="btn btn-medium" onclick="startGame('medium')">
+                            <span class="btn-text">MEDIUM</span>
+                            <div class="btn-shine"></div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="gameScreen" class="screen">
+            <div class="game-container">
+                <!-- Left Panel - Hangman Display -->
+                <div class="left-panel panel-3d">
+                    <canvas id="hangmanCanvas" width="450" height="500"></canvas>
+                    <div class="attempts-container">
+                        <span class="attempts-label">Attempts Remaining:</span>
+                        <span id="attemptsLeft" class="attempts-value">6</span>
+                    </div>
+                </div>
+
+                <!-- Right Panel - Word & Letters -->
+                <div class="right-panel panel-3d">
+                    <!-- Game Progress -->
+                    <div class="game-progress">
+                        <span class="progress-label">Word <span id="currentWordNum">1</span> of <span id="totalWords">1</span></span>
+                        <span class="score-label">Score: <span id="currentScore">0</span>/<span id="totalWordsScore">1</span></span>
+                    </div>
+                    
+                    <div class="word-display" id="wordDisplay"></div>
+                    
+                    <!-- Hints Section -->
+                    <div class="hints-container">
+                        <button id="hintButton" class="hint-button" onclick="useHint()">
+                            <span class="hint-icon">💡</span>
+                            <span class="hint-label">Reveal Letter</span>
+                        </button>
+                        <div class="hint-counter">
+                            <span class="hint-counter-label">Hints Left:</span>
+                            <span id="hintsLeft" class="hint-counter-value">3</span>
+                        </div>
+                    </div>
+                    
+                    <div class="letters-grid" id="lettersGrid"></div>
+                    
+                    <div class="game-info">
+                        <p class="difficulty-label">Difficulty: <span id="currentDifficulty"></span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Win/Lose Screen -->
+        <div id="resultScreen" class="screen">
+            <canvas id="particleCanvas" class="particle-canvas"></canvas>
+            <div class="result-container">
+                <h1 id="resultTitle" class="result-title">CONGRATULATIONS!</h1>
+                <p id="resultWord" class="result-word">The word was: <span id="revealWord"></span></p>
+                <div class="result-buttons">
+                    <button class="btn btn-play-again" onclick="showMenu()">
+                        <span class="btn-text">PLAY AGAIN</span>
+                        <div class="btn-shine"></div>
+                    </button>
+                    <button class="btn btn-menu" onclick="showMenu()">
+                        <span class="btn-text">MAIN MENU</span>
+                        <div class="btn-shine"></div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="hangman.js"></script>
+</body>
+</html>
