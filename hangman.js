@@ -50,6 +50,24 @@ let canvas, ctx;
 let particles = [];
 let particleCanvas, particleCtx;
 
+// Prevent audio play/pause errors globally
+window.addEventListener('error', function(e) {
+    // Suppress audio play/pause errors
+    if (e.message && e.message.includes('play()')) {
+        e.preventDefault();
+        return true;
+    }
+}, true);
+
+// Catch unhandled promise rejections (audio errors)
+window.addEventListener('unhandledrejection', function(e) {
+    // Check if it's an audio play error
+    if (e.reason && (e.reason.name === 'AbortError' || e.reason.name === 'NotAllowedError')) {
+        e.preventDefault();
+        console.log('Audio playback prevented by browser policy');
+    }
+});
+
 // Initialize
 window.onload = function() {
     canvas = document.getElementById('hangmanCanvas');
